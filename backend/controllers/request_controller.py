@@ -1,56 +1,89 @@
-from fastapi import HTTPException
+from fastapi import HTTPException, Depends
+from sqlalchemy.orm import Session
 from datetime import datetime
 import uuid
 from typing import List
 from models import Todo, TodoResponse
-from database import get_users_db, get_todos_db
+from database import get_db, UserDB, TodoDB
 
-def get_user_todos(user_id: str) -> List[TodoResponse]:
+def get_user_todos(user_id: str, db: Session = Depends(get_db)) -> List[TodoResponse]:
     """Get all todos for a specific user"""
-    todos_db = get_todos_db()
-    user_todos = [todo for todo in todos_db.values() if todo["user_id"] == user_id]
-    return user_todos
-
-def create_user_todo(user_id: str, todo: Todo) -> TodoResponse:
-    """Create a new todo for a user"""
-    users_db = get_users_db()
-    todos_db = get_todos_db()
+    todos = db.query(TodoDB).filter(TodoDB.user_id == user_id).all()
     
-    if user_id not in users_db:
+    return [
+        TodoResponse(
+            id=todo.id,
+            title=todo.title,
+            description=todo.description,
+            completed=todo.completed,
+            user_id=todo.user_id,
+            created_at=todo.created_at.isoformat()
+        )
+        for todo in todos
+    ]
+
+def create_user_todo(user_id: str, todo: Todo, db: Session = Depends(get_db)) -> TodoResponse:
+    """Create a new todo for a user"""
+    # Check if user exists
+    user = db.query(UserDB).filter(UserDB.id == user_id).first()
+    if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
+    # Create new todo
     todo_id = str(uuid.uuid4())
-    new_todo = {
-        "id": todo_id,
-        "title": todo.title,
-        "description": todo.description,
-        "completed": todo.completed,
-        "user_id": user_id,
-        "created_at": datetime.now().isoformat()
-    }
-    todos_db[todo_id] = new_todo
-    return TodoResponse(**new_todo)
+    db_todo = TodoDB(
+        id=todo_id,
+        title=todo.title,
+        description=todo.description,
+        completed=todo.completed,
+        user_id=user_id
+    )
+    
+    db.add(db_todo)
+    db.commit()
+    db.refresh(db_todo)
+    
+    return TodoResponse(
+        id=db_todo.id,
+        title=db_todo.title,
+        description=db_todo.description,
+        completed=db_todo.completed,
+        user_id=db_todo.user_id,
+        created_at=db_todo.created_at.isoformat()
+    )
 
-def update_user_todo(todo_id: str, todo: Todo) -> TodoResponse:
+def update_user_todo(todo_id: str, todo: Todo, db: Session = Depends(get_db)) -> TodoResponse:
     """Update an existing todo"""
-    todos_db = get_todos_db()
+    db_todo = db.query(TodoDB).filter(TodoDB.id == todo_id).first()
     
-    if todo_id not in todos_db:
+    if not db_todo:
         raise HTTPException(status_code=404, detail="Todo not found")
     
-    todos_db[todo_id].update({
-        "title": todo.title,
-        "description": todo.description,
-        "completed": todo.completed
-    })
-    return TodoResponse(**todos_db[todo_id])
+    # Update fields
+    db_todo.title = todo.title
+    db_todo.description = todo.description
+    db_todo.completed = todo.completed
+    
+    db.commit()
+    db.refresh(db_todo)
+    
+    return TodoResponse(
+        id=db_todo.id,
+        title=db_todo.title,
+        description=db_todo.description,
+        completed=db_todo.completed,
+        user_id=db_todo.user_id,
+        created_at=db_todo.created_at.isoformat()
+    )
 
-def delete_user_todo(todo_id: str) -> dict:
+def delete_user_todo(todo_id: str, db: Session = Depends(get_db)) -> dict:
     """Delete a todo"""
-    todos_db = get_todos_db()
+    db_todo = db.query(TodoDB).filter(TodoDB.id == todo_id).first()
     
-    if todo_id not in todos_db:
+    if not db_todo:
         raise HTTPException(status_code=404, detail="Todo not found")
     
-    del todos_db[todo_id]
+    db.delete(db_todo)
+    db.commit()
+    
     return {"message": "Todo deleted successfully"}

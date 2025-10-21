@@ -53,7 +53,12 @@ function App() {
 
       if (!res.ok) {
         const error = await res.json();
-        throw new Error(error.detail);
+        // Handle validation errors
+        if (error.detail && Array.isArray(error.detail)) {
+          const errorMsg = error.detail.map(e => e.msg).join(', ');
+          throw new Error(errorMsg);
+        }
+        throw new Error(error.detail || 'An error occurred');
       }
 
       const userData = await res.json();
@@ -145,7 +150,7 @@ function App() {
             />
             <input
               type="password"
-              placeholder="Password"
+              placeholder="Password (6-72 characters)"
               value={formData.password}
               onChange={(e) => setFormData({...formData, password: e.target.value})}
               onKeyPress={(e) => e.key === 'Enter' && handleAuth()}
