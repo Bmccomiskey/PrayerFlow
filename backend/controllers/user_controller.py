@@ -1,7 +1,7 @@
 from fastapi import HTTPException, Depends
 from sqlalchemy.orm import Session
 import uuid
-from models import User, UserResponse
+from models import User, UserResponse, LoginRequest
 from database import get_db, UserDB
 from utils import hash_password, verify_password
 
@@ -35,11 +35,11 @@ def register_user(user: User, db: Session = Depends(get_db)) -> UserResponse:
         email=db_user.email
     )
 
-def login_user(email: str, password: str, db: Session = Depends(get_db)) -> UserResponse:
+def login_user(login_data: LoginRequest, db: Session = Depends(get_db)) -> UserResponse:
     """Login an existing user"""
-    user = db.query(UserDB).filter(UserDB.email == email).first()
+    user = db.query(UserDB).filter(UserDB.email == login_data.email).first()
     
-    if not user or not verify_password(password, user.hashed_password):
+    if not user or not verify_password(login_data.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
     return UserResponse(

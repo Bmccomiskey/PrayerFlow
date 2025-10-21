@@ -39,14 +39,16 @@ function App() {
     
     try {
       const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
-      const body = isLogin 
-        ? new URLSearchParams({ email: formData.email, password: formData.password })
-        : JSON.stringify(formData);
+      const body = JSON.stringify(
+        isLogin 
+          ? { email: formData.email, password: formData.password }
+          : formData
+      );
       
       const res = await fetch(`${API_URL}${endpoint}`, {
         method: 'POST',
         headers: {
-          'Content-Type': isLogin ? 'application/x-www-form-urlencoded' : 'application/json'
+          'Content-Type': 'application/json'
         },
         body
       });

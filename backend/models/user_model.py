@@ -25,6 +25,12 @@ class User(BaseModel):
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
+    
+    @validator('password')
+    def validate_password(cls, v):
+        if not v:
+            raise ValueError('Password is required')
+        return v
 
 class UserResponse(BaseModel):
     id: str
